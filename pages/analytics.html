@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusMind — Progress</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .chart-bar-wrap { display:flex; align-items:flex-end; gap:8px; height:160px; padding:0 4px; }
+    .chart-col      { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; min-width:0; }
+    .chart-bar      {
+      width:100%; border-radius:6px 6px 0 0;
+      background:linear-gradient(180deg,var(--secondary),var(--accent));
+      transition:height .5s cubic-bezier(.4,0,.2,1); min-height:4px;
+    }
+    .chart-bar:hover { filter:brightness(1.12); }
+    .chart-label    { font-size:.72rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+    .chart-val      { font-size:.75rem; font-weight:600; color:var(--text); }
+    .stress-dot     { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+    .filter-btn     { padding:6px 14px; border-radius:20px; border:1.5px solid var(--border); background:#fff; font-size:.82rem; font-family:'Poppins',sans-serif; cursor:pointer; font-weight:500; transition:background .15s,color .15s,border-color .15s; }
+    .filter-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+  </style>
+</head>
+<body>
+
+<header class="navbar" id="navbar"></header>
+
+<main class="page-wrap">
+
+  <h1>Progress &amp; Analytics</h1>
+  <p style="margin-top:6px">Track your cognitive performance and stress history over time.</p>
+
+  <!-- Summary stats -->
+  <div class="dash-grid mt-24">
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-purple">🎮</div>
+        <div class="dash-stat-info"><h3 id="s-total">0</h3><p>Total Games Played</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-green">📈</div>
+        <div class="dash-stat-info"><h3 id="s-avg">—</h3><p>Average Score</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-yellow">🏆</div>
+        <div class="dash-stat-info"><h3 id="s-best">—</h3><p>Personal Best</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-blue">🧘</div>
+        <div class="dash-stat-info"><h3 id="s-tests">0</h3><p>Stress Tests Taken</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Score chart -->
+  <div class="card mt-24">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <h2>Score History</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="setFilter('Memory Match',this)">Memory</button>
+        <button class="filter-btn" onclick="setFilter('Color Sequence',this)">Sequence</button>
+        <button class="filter-btn" onclick="setFilter('Reaction Speed',this)">Reaction</button>
+      </div>
+    </div>
+    <div id="score-chart" class="chart-bar-wrap"></div>
+    <div id="chart-empty" class="empty-state hidden">
+      <div class="empty-icon">📊</div>
+      <p>No scores yet — play a game first!</p>
+    </div>
+  </div>
+
+  <!-- Stress history -->
+  <div class="card mt-24">
+    <h2 style="margin-bottom:20px">Stress Assessment History</h2>
+    <div id="stress-history"></div>
+  </div>
+
+  <!-- Full score table -->
+  <div class="card mt-24">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2>All Game Sessions</h2>
+      <button class="btn btn-sm btn-danger" onclick="clearScores()" id="clear-btn" style="display:none">Clear History</button>
+    </div>
+    <div id="score-table-wrap"></div>
+  </div>
+
+</main>
+
+<script src="../script.js"></script>
+<script>
+FM.requireAuth();
+FM.renderNav('analytics');
+
+const user   = FM.getCurrentUser();
+const scores = user.scores || [];
+const tests  = user.stressHistory || [];
+
+document.getElementById('s-total').textContent = scores.length;
+document.getElementById('s-tests').textContent = tests.length;
+if (scores.length) {
+  const avg  = Math.round(scores.reduce((a,b) => a + b.score, 0) / scores.length);
+  const best = Math.max(...scores.map(s => s.score));
+  document.getElementById('s-avg').textContent  = avg;
+  document.getElementById('s-best').textContent = best;
+}
+
+let currentFilter = 'all';
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderChart();
+}
+
+function renderChart() {
+  const container = document.getElementById('score-chart');
+  const empty     = document.getElementById('chart-empty');
+  const filtered  = currentFilter === 'all' ? scores : scores.filter(s => s.game === currentFilter);
+  const recent    = [...filtered].slice(0, 15).reverse();
+  if (!recent.length) {
+    container.innerHTML = ''; empty.classList.remove('hidden'); return;
+  }
+  empty.classList.add('hidden');
+  const maxScore = Math.max(...recent.map(s => s.score), 1);
+  container.innerHTML = recent.map(s => {
+    const pct   = Math.round((s.score / maxScore) * 100);
+    const label = new Date(s.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return `
+      <div class="chart-col" title="${s.game}: ${s.score} pts — ${label}">
+        <div class="chart-val">${s.score}</div>
+        <div class="chart-bar" style="height:${pct}%"></div>
+        <div class="chart-label">${label}</div>
+      </div>`;
+  }).join('');
+}
+renderChart();
+
+const stressContainer = document.getElementById('stress-history');
+if (!tests.length) {
+  stressContainer.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🧘</div>
+      <p>No stress tests taken yet.</p>
+      <a href="stress-test.html" class="btn btn-primary mt-16">Take Stress Test</a>
+    </div>`;
+} else {
+  const dotColor = { low:'#10b981', moderate:'#f59e0b', high:'#ef4444' };
+  stressContainer.innerHTML = `
+    <table class="score-table">
+      <thead><tr><th>#</th><th>Date</th><th>Score</th><th>Level</th></tr></thead>
+      <tbody>${[...tests].reverse().map((t,i) => `
+        <tr>
+          <td>${tests.length - i}</td>
+          <td>${FM.formatDate(t.date)}</td>
+          <td><strong>${t.score}</strong> / 25</td>
+          <td><span class="stress-dot" style="background:${dotColor[t.level]}"></span>${FM.stressLabel(t.level)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+const tableWrap = document.getElementById('score-table-wrap');
+if (!scores.length) {
+  tableWrap.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🎮</div>
+      <p>Play some games to see your score history here.</p>
+      <a href="games.html" class="btn btn-primary mt-16">Browse Games</a>
+    </div>`;
+} else {
+  document.getElementById('clear-btn').style.display = 'inline-flex';
+  tableWrap.innerHTML = `
+    <table class="score-table">
+      <thead><tr><th>Game</th><th>Score</th><th>Details</th><th>Date</th></tr></thead>
+      <tbody>${scores.map(s => `
+        <tr>
+          <td>${s.game}</td>
+          <td><strong>${s.score}</strong></td>
+          <td style="color:var(--text-muted)">${s.details || '—'}</td>
+          <td style="color:var(--text-muted)">${FM.formatDate(s.date)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function clearScores() {
+  if (!confirm('Clear all game score history? This cannot be undone.')) return;
+  const u = FM.getCurrentUser();
+  u.scores = [];
+  FM.updateUser(u);
+  FM.toast('History cleared', '', 'success');
+  setTimeout(() => location.reload(), 600);
+}
+</script>
+</body>
+</html>

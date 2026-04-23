@@ -1,0 +1,91 @@
+{
+  "_info": {
+    "app": "FocusMind",
+    "version": "1.0.0",
+    "description": "Default seed data loaded into localStorage on first run. Actual runtime data lives in browser localStorage under keys fm_users and fm_session.",
+    "pss_scale": {
+      "name": "Perceived Stress Scale (PSS-10)",
+      "authors": "Cohen, Kamarck & Mermelstein (1983)",
+      "items": 10,
+      "min_score": 0,
+      "max_score": 40,
+      "thresholds": {
+        "low":      "0–13",
+        "moderate": "14–26",
+        "high":     "27–40"
+      },
+      "reverse_scored_items": [4, 5, 7, 8]
+    }
+  },
+
+  "fm_users": [],
+
+  "fm_session": null,
+
+  "schema": {
+    "user": {
+      "id":             "string  — unique ID e.g. u_1713456789012",
+      "name":           "string  — full name",
+      "age":            "number",
+      "gender":         "string  — Male | Female | Other | Prefer not to say",
+      "email":          "string",
+      "password":       "string  — plain text (local only, no server)",
+      "stressScore":    "number | null  — latest PSS-10 total (0–40)",
+      "stressLevel":    "string | null  — low | moderate | high",
+      "stressHistory":  [
+        {
+          "score": "number  — PSS-10 total",
+          "level": "string  — low | moderate | high",
+          "date":  "string  — ISO 8601 datetime"
+        }
+      ],
+      "scores": [
+        {
+          "id":      "number  — timestamp",
+          "game":    "string  — Memory Match | Color Sequence | Reaction Speed",
+          "score":   "number",
+          "details": "string  — e.g. 'normal • 8/8 pairs • 14 moves'",
+          "date":    "string  — ISO 8601 datetime"
+        }
+      ],
+      "joinDate": "string  — ISO 8601 datetime"
+    }
+  },
+
+  "games": [
+    {
+      "id":          "memory",
+      "title":       "Memory Match",
+      "description": "Flip cards to find all matching pairs before time runs out.",
+      "file":        "games/memory.html",
+      "difficulties": {
+        "easy":   { "grid": "3x4", "pairs": 6,  "timeLimit": 90  },
+        "normal": { "grid": "4x4", "pairs": 8,  "timeLimit": 120 },
+        "hard":   { "grid": "5x4", "pairs": 10, "timeLimit": 150 }
+      },
+      "recommended_for": ["low", "moderate", "high"]
+    },
+    {
+      "id":          "color-sequence",
+      "title":       "Color Sequence",
+      "description": "Watch the Simon-says color pattern and repeat it from memory.",
+      "file":        "games/color-game.html",
+      "scoring":     "level * 10 points per correct round",
+      "recommended_for": ["low", "moderate", "high"]
+    },
+    {
+      "id":          "reaction",
+      "title":       "Reaction Speed",
+      "description": "Click when the circle turns green. 5 rounds, average time scored.",
+      "file":        "games/reaction.html",
+      "ratings": {
+        "superhuman": "< 200 ms",
+        "excellent":  "< 300 ms",
+        "good":       "< 400 ms",
+        "average":    "< 500 ms",
+        "keep_trying": ">= 500 ms"
+      },
+      "recommended_for": ["low", "moderate"]
+    }
+  ]
+}

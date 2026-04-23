@@ -1,0 +1,2 @@
+/* Root stylesheet — imports from css/style.css so all existing HTML links still work */
+@import url('./css/style.css');

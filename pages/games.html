@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusMind — Games</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="navbar" id="navbar"></header>
+
+<main class="page-wrap">
+
+  <div style="margin-bottom:8px">
+    <h1>Brain Games</h1>
+    <p id="games-subtitle" style="margin-top:6px;font-size:1rem;max-width:560px"></p>
+  </div>
+
+  <!-- Stress level banner -->
+  <div id="stress-banner" class="card hidden" style="margin-top:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="font-size:1.5rem" id="banner-emoji"></div>
+    <div style="flex:1">
+      <div style="font-weight:600;color:var(--text)" id="banner-title"></div>
+      <div style="font-size:.85rem;color:var(--text-muted)" id="banner-msg"></div>
+    </div>
+    <a href="stress-test.html" class="btn btn-outline btn-sm">Retake Test</a>
+  </div>
+
+  <!-- All games -->
+  <div class="mt-24">
+    <h2 style="margin-bottom:16px">All Games</h2>
+    <div class="games-grid" id="games-grid"></div>
+  </div>
+
+</main>
+
+<script src="../script.js"></script>
+<script>
+FM.requireAuth();
+FM.renderNav('games');
+
+const user = FM.getCurrentUser();
+const level = user.stressLevel;
+
+document.getElementById('games-subtitle').textContent = level
+  ? 'Games are ordered by recommendation based on your stress level.'
+  : 'Take the stress test to get personalised recommendations.';
+
+if (level) {
+  document.getElementById('stress-banner').classList.remove('hidden');
+  document.getElementById('stress-banner').style.display = 'flex';
+  document.getElementById('banner-emoji').textContent = FM.stressEmoji(level);
+  document.getElementById('banner-title').textContent = `Your stress level is: ${FM.stressLabel(level)}`;
+  const msg = {
+    low:      'You\'re doing great! All games are available. Try harder difficulty modes.',
+    moderate: 'Memory and sequence games are especially good for you right now.',
+    high:     'Start with Memory Match on easy mode. Take breaks between games.'
+  };
+  document.getElementById('banner-msg').textContent = msg[level];
+}
+
+const GAMES = [
+  {
+    title: 'Memory Match',
+    desc:  'Flip cards to find all matching pairs before time runs out. Tests visual memory and concentration.',
+    icon:  '🃏',
+    iconBg:'background:linear-gradient(135deg,#ede9fe,#c4b5fd)',
+    tags:  [{ label:'Memory', cls:'tag-purple' }, { label:'2–5 min', cls:'tag-green' }],
+    href:  '../games/memory.html',
+    rec:   ['low','moderate','high']
+  },
+  {
+    title: 'Color Sequence',
+    desc:  'Watch the pattern of colored buttons light up, then repeat it from memory. Like Simon Says.',
+    icon:  '🎨',
+    iconBg:'background:linear-gradient(135deg,#dbeafe,#93c5fd)',
+    tags:  [{ label:'Focus', cls:'tag-blue' }, { label:'3–10 min', cls:'tag-green' }],
+    href:  '../games/color-game.html',
+    rec:   ['low','moderate','high']
+  },
+  {
+    title: 'Reaction Speed',
+    desc:  'Click the target circle the moment it turns green. Measures and improves your reaction time.',
+    icon:  '⚡',
+    iconBg:'background:linear-gradient(135deg,#fef3c7,#fde68a)',
+    tags:  [{ label:'Speed', cls:'tag-orange' }, { label:'1–3 min', cls:'tag-green' }],
+    href:  '../games/reaction.html',
+    rec:   ['low','moderate']
+  }
+];
+
+// Sort: recommended first
+const sorted = level
+  ? [...GAMES].sort((a, b) => b.rec.includes(level) - a.rec.includes(level))
+  : GAMES;
+
+const container = document.getElementById('games-grid');
+sorted.forEach(g => {
+  const isRec = level && g.rec.includes(level);
+  container.innerHTML += `
+    <a href="${g.href}" class="game-card">
+      <div class="game-icon" style="${g.iconBg}">${g.icon}</div>
+      <div class="game-title">${g.title}</div>
+      <div class="game-desc">${g.desc}</div>
+      <div class="game-meta">
+        ${g.tags.map(t => `<span class="tag ${t.cls}">${t.label}</span>`).join('')}
+        ${isRec ? '<span class="recommended-banner">⭐ Recommended</span>' : ''}
+      </div>
+    </a>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusMind — Color Sequence</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.55);
+      display:flex; align-items:center; justify-content:center; z-index:200;
+    }
+    .overlay-card {
+      background:#fff; border-radius:20px; padding:40px 36px;
+      text-align:center; max-width:380px; width:90%; animation:fadeUp .3s ease;
+    }
+    .overlay-icon  { font-size:3.5rem; margin-bottom:12px; }
+    .overlay-title { font-size:1.5rem; font-weight:700; color:var(--text); margin-bottom:8px; }
+    .overlay-sub   { color:var(--text-muted); font-size:.92rem; margin-bottom:24px; }
+    .overlay-stats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px; }
+    .ov-stat       { background:var(--bg); border-radius:10px; padding:10px; }
+    .ov-stat-val   { font-size:1.3rem; font-weight:700; color:var(--text); }
+    .ov-stat-lbl   { font-size:.75rem; color:var(--text-muted); margin-top:2px; }
+
+    #message-box {
+      font-size:1.1rem; font-weight:600; color:var(--text);
+      min-height:32px; text-align:center; transition:color .2s;
+    }
+    #level-indicator {
+      font-size:.88rem; color:var(--text-muted); text-align:center; margin-bottom:6px;
+    }
+  </style>
+</head>
+<body>
+
+<header class="navbar" id="navbar"></header>
+
+<main class="game-page" style="max-width:520px">
+
+  <div class="game-header">
+    <a href="../pages/games.html" class="btn btn-outline btn-sm">← Back</a>
+    <div>
+      <h1>🎨 Color Sequence</h1>
+      <p style="margin:0;font-size:.88rem">Watch and repeat the color sequence.</p>
+    </div>
+  </div>
+
+  <!-- Setup -->
+  <div class="card" id="setup-panel">
+    <h2 style="margin-bottom:8px">How to Play</h2>
+    <p style="margin-bottom:16px">
+      A sequence of colors will light up one by one. After the sequence ends, repeat it by clicking the same buttons in the same order. The sequence gets longer each round!
+    </p>
+    <p id="diff-note" style="margin-bottom:20px;font-weight:500"></p>
+    <button class="btn btn-primary btn-lg" onclick="startGame()">Start Game</button>
+  </div>
+
+  <!-- Game panel -->
+  <div class="hidden" id="game-panel">
+    <div class="game-stats">
+      <div class="stat-pill">🏅 Level: <span id="stat-level">1</span></div>
+      <div class="stat-pill">🔢 Sequence: <span id="stat-seqlen">1</span></div>
+      <div class="stat-pill">🏆 Score: <span id="stat-score">0</span></div>
+    </div>
+
+    <div class="card" style="padding:24px">
+      <div id="level-indicator">Level 1 — Watch the sequence…</div>
+      <div id="message-box" style="margin-bottom:20px"></div>
+      <div class="simon-grid">
+        <button class="simon-btn simon-red    dim" id="btn-red"    onclick="playerClick('red')"   >🔴</button>
+        <button class="simon-btn simon-blue   dim" id="btn-blue"   onclick="playerClick('blue')"  >🔵</button>
+        <button class="simon-btn simon-green  dim" id="btn-green"  onclick="playerClick('green')" >🟢</button>
+        <button class="simon-btn simon-yellow dim" id="btn-yellow" onclick="playerClick('yellow')">🟡</button>
+      </div>
+      <div style="text-align:center;margin-top:20px">
+        <button class="btn btn-sm btn-outline" onclick="resetGame()">Quit</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Result overlay -->
+<div class="overlay hidden" id="result-overlay">
+  <div class="overlay-card">
+    <div class="overlay-icon" id="res-icon">🎉</div>
+    <div class="overlay-title" id="res-title">Game Over</div>
+    <div class="overlay-sub"   id="res-sub"></div>
+    <div class="overlay-stats">
+      <div class="ov-stat"><div class="ov-stat-val" id="res-level">—</div><div class="ov-stat-lbl">Level Reached</div></div>
+      <div class="ov-stat"><div class="ov-stat-val" id="res-score">—</div><div class="ov-stat-lbl">Score</div></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button class="btn btn-primary" onclick="playAgain()">Play Again</button>
+      <a href="../pages/games.html"    class="btn btn-outline">All Games</a>
+      <a href="../pages/analytics.html" class="btn btn-outline">My Progress</a>
+    </div>
+  </div>
+</div>
+
+<script src="../script.js"></script>
+<script>
+FM.requireAuth();
+FM.renderNav('games');
+
+const user  = FM.getCurrentUser();
+const level = user.stressLevel;
+
+const COLORS    = ['red','blue','green','yellow'];
+const BASE_SPEED = level === 'high' ? 900 : level === 'low' ? 450 : 650;
+
+const diffMsgs = {
+  high:     '😌 Relaxed mode: slower sequences to help you focus calmly.',
+  moderate: '😐 Normal mode: balanced speed and sequence length.',
+  low:      '😄 Challenge mode: faster sequences to test your limits!',
+  default:  'Repeat the color sequence — it gets longer each round!'
+};
+document.getElementById('diff-note').textContent = diffMsgs[level] || diffMsgs.default;
+
+let sequence = [], playerSeq = [], currentLevel = 1, score = 0;
+let accepting = false, gameRunning = false;
+
+function startGame() {
+  document.getElementById('setup-panel').classList.add('hidden');
+  document.getElementById('game-panel').classList.remove('hidden');
+  sequence = []; currentLevel = 1; score = 0;
+  gameRunning = true;
+  nextRound();
+}
+
+function nextRound() {
+  accepting = false;
+  playerSeq = [];
+  sequence.push(COLORS[Math.floor(Math.random() * 4)]);
+  updateStats();
+  setMessage('Watch the sequence…', 'var(--text-muted)');
+  setTimeout(() => playSequence(), 600);
+}
+
+function playSequence() {
+  let i = 0;
+  const speed = Math.max(BASE_SPEED - currentLevel * 20, 250);
+  function next() {
+    if (i >= sequence.length) {
+      setTimeout(() => {
+        setMessage('Your turn! Repeat the sequence.', 'var(--secondary)');
+        setAllDim(false);
+        accepting = true;
+      }, speed * 0.5);
+      return;
+    }
+    const color = sequence[i++];
+    lightUp(color, speed * 0.55);
+    setTimeout(next, speed);
+  }
+  setAllDim(true);
+  setTimeout(next, 400);
+}
+
+function playerClick(color) {
+  if (!accepting || !gameRunning) return;
+  lightUp(color, 200);
+  playerSeq.push(color);
+  const idx = playerSeq.length - 1;
+  if (playerSeq[idx] !== sequence[idx]) {
+    accepting = false;
+    setMessage('❌ Wrong! Game over.', 'var(--danger)');
+    setAllDim(true);
+    setTimeout(() => showResult(false), 700);
+    return;
+  }
+  if (playerSeq.length === sequence.length) {
+    accepting = false;
+    score += currentLevel * 10;
+    currentLevel++;
+    setMessage('✅ Correct! Get ready…', 'var(--success)');
+    setAllDim(true);
+    setTimeout(nextRound, 900);
+  }
+}
+
+function lightUp(color, duration) {
+  const btn = document.getElementById('btn-' + color);
+  btn.classList.remove('dim');
+  btn.classList.add('lit');
+  setTimeout(() => { btn.classList.remove('lit'); btn.classList.add('dim'); }, duration);
+}
+
+function setAllDim(dim) {
+  COLORS.forEach(c => {
+    const btn = document.getElementById('btn-' + c);
+    btn.classList.toggle('dim', dim);
+    btn.classList.remove('lit');
+  });
+}
+
+function setMessage(msg, color) {
+  const el = document.getElementById('message-box');
+  el.textContent = msg;
+  el.style.color = color || 'var(--text)';
+}
+
+function updateStats() {
+  document.getElementById('stat-level').textContent  = currentLevel;
+  document.getElementById('stat-seqlen').textContent = sequence.length;
+  document.getElementById('stat-score').textContent  = score;
+  document.getElementById('level-indicator').textContent = `Level ${currentLevel}`;
+}
+
+function showResult(won) {
+  gameRunning = false;
+  document.getElementById('res-icon').textContent  = won ? '🏆' : '💥';
+  document.getElementById('res-title').textContent = won ? 'Amazing!' : 'Game Over';
+  document.getElementById('res-sub').textContent   = won
+    ? 'You completed every level!'
+    : `You reached level ${currentLevel} with a sequence of ${sequence.length}.`;
+  document.getElementById('res-level').textContent = currentLevel;
+  document.getElementById('res-score').textContent = score;
+  document.getElementById('result-overlay').classList.remove('hidden');
+
+  FM.saveScore('Color Sequence', score, `Level ${currentLevel} • ${sequence.length} colors`);
+  FM.toast('Score saved!', `${score} points`, 'success');
+}
+
+function playAgain() {
+  document.getElementById('result-overlay').classList.add('hidden');
+  sequence = []; currentLevel = 1; score = 0;
+  gameRunning = true;
+  setAllDim(true);
+  nextRound();
+}
+
+function resetGame() {
+  gameRunning = false; accepting = false;
+  clearTimeout();
+  document.getElementById('game-panel').classList.add('hidden');
+  document.getElementById('setup-panel').classList.remove('hidden');
+}
+</script>
+</body>
+</html>

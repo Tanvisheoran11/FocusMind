@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusMind — Dashboard</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="navbar" id="navbar"></header>
+
+<main class="page-wrap">
+
+  <!-- Hero welcome -->
+  <div class="hero">
+    <h1 id="welcome-msg">Welcome back! 👋</h1>
+    <p id="welcome-sub" style="margin-top:6px;font-size:1rem"></p>
+  </div>
+
+  <!-- Stats row -->
+  <div class="dash-grid">
+
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-purple">🎯</div>
+        <div class="dash-stat-info">
+          <h3 id="stat-games">0</h3>
+          <p>Games Played</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-green">🏆</div>
+        <div class="dash-stat-info">
+          <h3 id="stat-best">—</h3>
+          <p>Best Score</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-yellow">🧘</div>
+        <div class="dash-stat-info">
+          <h3 id="stat-stress">—</h3>
+          <p>Current Stress Level</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="dash-stat">
+        <div class="dash-stat-icon icon-blue">📅</div>
+        <div class="dash-stat-info">
+          <h3 id="stat-tests">0</h3>
+          <p>Stress Tests Taken</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Stress card -->
+  <div class="card mt-24" id="stress-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2>Stress Assessment</h2>
+        <p id="stress-description" style="margin-top:6px;max-width:520px"></p>
+      </div>
+      <a href="stress-test.html" class="btn btn-primary" id="stress-cta">Take Stress Test</a>
+    </div>
+    <div id="stress-result-section" class="hidden" style="margin-top:20px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div id="stress-badge"></div>
+        <div>
+          <div style="font-size:.88rem;color:var(--text-muted)">Last assessed: <span id="stress-date"></span></div>
+          <div style="font-size:.88rem;color:var(--text-muted);margin-top:2px">Score: <span id="stress-score" style="font-weight:600;color:var(--text)"></span> / 15</div>
+        </div>
+      </div>
+      <div id="stress-advice" style="margin-top:14px;padding:14px;background:var(--bg);border-radius:10px;font-size:.9rem;color:var(--text)"></div>
+    </div>
+  </div>
+
+  <!-- Recommended Games -->
+  <div class="mt-24">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h2>Recommended Games</h2>
+      <a href="games.html" style="color:var(--secondary);font-size:.88rem;font-weight:500">View all →</a>
+    </div>
+    <p id="rec-description" style="margin-bottom:16px"></p>
+    <div class="games-grid" id="recommended-games"></div>
+  </div>
+
+  <!-- Recent Scores -->
+  <div class="card mt-24">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2>Recent Activity</h2>
+      <a href="analytics.html" style="color:var(--secondary);font-size:.88rem;font-weight:500">Full history →</a>
+    </div>
+    <div id="recent-scores"></div>
+  </div>
+
+</main>
+
+<script src="../script.js"></script>
+<script>
+FM.requireAuth();
+FM.renderNav('dashboard');
+
+const user = FM.getCurrentUser();
+
+// Welcome
+document.getElementById('welcome-msg').textContent = `Welcome back, ${user.name}! 👋`;
+const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+document.getElementById('welcome-sub').textContent = today;
+
+// Stats
+const games  = user.scores || [];
+const tests  = user.stressHistory || [];
+document.getElementById('stat-games').textContent = games.length;
+document.getElementById('stat-tests').textContent = tests.length;
+
+const bestScore = games.length ? Math.max(...games.map(s => s.score)) : null;
+document.getElementById('stat-best').textContent = bestScore !== null ? bestScore : '—';
+
+const stressLvl = user.stressLevel;
+if (stressLvl) {
+  document.getElementById('stat-stress').textContent = FM.stressLabel(stressLvl);
+} else {
+  document.getElementById('stat-stress').textContent = 'Not assessed';
+}
+
+// Stress section
+if (stressLvl && user.stressScore != null) {
+  document.getElementById('stress-description').textContent =
+    'Your most recent stress assessment result is shown below.';
+  document.getElementById('stress-cta').textContent = 'Retake Test';
+  document.getElementById('stress-result-section').classList.remove('hidden');
+
+  const badgeClass = { low: 'badge-low', moderate: 'badge-moderate', high: 'badge-high' }[stressLvl];
+  document.getElementById('stress-badge').innerHTML =
+    `<span class="badge ${badgeClass}" style="font-size:.95rem;padding:6px 16px">
+      ${FM.stressEmoji(stressLvl)} ${FM.stressLabel(stressLvl)}
+    </span>`;
+  document.getElementById('stress-score').textContent = user.stressScore + ' / 40';
+
+  const lastTest = tests.length ? FM.formatDate(tests[tests.length-1].date) : 'Today';
+  document.getElementById('stress-date').textContent = lastTest;
+
+  const advice = {
+    low:      '🟢 You\'re managing well! Challenge yourself with harder cognitive games to sharpen focus.',
+    moderate: '🟡 Take short breaks throughout the day. The memory and sequence games are perfect for you right now.',
+    high:     '🔴 Try to rest and breathe. Start with calming, easy games. Consider talking to someone if stress persists.'
+  };
+  document.getElementById('stress-advice').textContent = advice[stressLvl];
+} else {
+  document.getElementById('stress-description').textContent =
+    'You haven\'t taken the stress assessment yet. It only takes 2 minutes and helps us recommend the right games for you.';
+}
+
+// Recommended games
+const allGames = [
+  {
+    id: 'memory',
+    title: 'Memory Match',
+    desc: 'Flip cards to find matching pairs. Trains visual memory and concentration.',
+    icon: '🃏',
+    iconBg: 'background:linear-gradient(135deg,#ede9fe,#c4b5fd)',
+    tag: 'Memory',
+    tagClass: 'tag-purple',
+    diff: { low:'Hard (5×4)', moderate:'Normal (4×4)', high:'Easy (3×4)' },
+    href: '../games/memory.html',
+    forLevels: ['low','moderate','high',null]
+  },
+  {
+    id: 'sequence',
+    title: 'Color Sequence',
+    desc: 'Watch the color pattern and repeat it. Trains short-term memory and attention.',
+    icon: '🎨',
+    iconBg: 'background:linear-gradient(135deg,#dbeafe,#93c5fd)',
+    tag: 'Focus',
+    tagClass: 'tag-blue',
+    diff: { low:'Hard', moderate:'Normal', high:'Easy' },
+    href: '../games/color-game.html',
+    forLevels: ['low','moderate','high',null]
+  },
+  {
+    id: 'reaction',
+    title: 'Reaction Speed',
+    desc: 'Click the target as fast as you can when it appears. Tests reaction time.',
+    icon: '⚡',
+    iconBg: 'background:linear-gradient(135deg,#fef3c7,#fde68a)',
+    tag: 'Speed',
+    tagClass: 'tag-orange',
+    diff: { low:'Challenge', moderate:'Normal', high:'Relaxed' },
+    href: '../games/reaction.html',
+    forLevels: ['low','moderate',null]
+  }
+];
+
+const recommended = stressLvl
+  ? allGames.filter(g => g.forLevels.includes(stressLvl))
+  : allGames;
+
+const recDesc = {
+  low:      'Your stress is low — try challenging games to push your cognitive limits.',
+  moderate: 'Games at a medium pace will help you focus without adding pressure.',
+  high:     'Calming, easy games are best right now. Take it easy and enjoy the process.'
+};
+document.getElementById('rec-description').textContent = stressLvl
+  ? recDesc[stressLvl]
+  : 'Take the stress test to get personalised game recommendations, or browse all games.';
+
+const container = document.getElementById('recommended-games');
+recommended.slice(0, 3).forEach(g => {
+  const diff = g.diff[stressLvl] || g.diff.moderate;
+  container.innerHTML += `
+    <a href="${g.href}" class="game-card">
+      <div class="game-icon" style="${g.iconBg}">${g.icon}</div>
+      <div class="game-title">${g.title}</div>
+      <div class="game-desc">${g.desc}</div>
+      <div class="game-meta">
+        <span class="tag ${g.tagClass}">${g.tag}</span>
+        <span class="tag" style="background:#f3f4f6;color:#374151">${diff}</span>
+        ${stressLvl ? '<span class="recommended-banner">⭐ Recommended</span>' : ''}
+      </div>
+    </a>`;
+});
+
+// Recent scores
+const scoreContainer = document.getElementById('recent-scores');
+if (games.length === 0) {
+  scoreContainer.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🎮</div>
+      <p>No games played yet. Start a game to see your scores here!</p>
+      <a href="games.html" class="btn btn-primary mt-16">Browse Games</a>
+    </div>`;
+} else {
+  scoreContainer.innerHTML = `
+    <table class="score-table">
+      <thead><tr>
+        <th>Game</th><th>Score</th><th>Details</th><th>Date</th>
+      </tr></thead>
+      <tbody>
+        ${games.slice(0,5).map(s => `
+          <tr>
+            <td>${s.game}</td>
+            <td><strong>${s.score}</strong></td>
+            <td style="color:var(--text-muted)">${s.details}</td>
+            <td style="color:var(--text-muted)">${FM.formatDate(s.date)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+</script>
+</body>
+</html>
